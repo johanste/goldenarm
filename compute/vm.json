@@ -1,318 +1,182 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
-    "parameters": {
-	"name": {
-	    "type": "string",
-	    "metadata": {
-		"description": "Name of Virtual Machine"
-	    }
-	},
-	"size": {
-	    "type": "string",
-	    "defaultValue": "Standard_DS1_V2",
-	    "metadata": {
-			"description": "Size of Virtual Machine"
-	    }
-	},
-	"availabilitySet": {
-	    "type": "string",
-	    "defaultValue": ""
-	},
-	"imageReference": {
-	    "type": "object",
-	    "defaultValue": {},
-	    "metadata": {
-		"description": "Image reference including id, publisher, offer, sku, version"
-	    }
-	},
-	"publicIpAddressName": {
-	    "type": "string",
-		"defaultValue": "",
-	    "metadata": {
-			"description": "Name or ID of public IP address to create or reference"
-	    }
-	},
-	"publicIpAddressDnsLabelPrefix": {
-	    "type": "string",
-	    "defaultValue": null
-	},
-	"publicIpAddressType": {
-	    "type": "string",
-	    "allowedValues": [
-		"Static",
-		"Dynamic"
-		]
-	},
-	
-	"image": {
-	    "type": "string",
-	    "metadata": {
-		"description": "Image URN of VM to create"
-	    }
-	},
-	"adminUsername": {
-	    "type": "string",
-	    "metadata": {
-		"description": "User name for the Virtual Machine."
-	    }
-	},
-	"adminPassword": {
-	    "type": "securestring",
-	    "metadata": {
-		"description": "Password for the Virtual Machine."
-	    }
-	},
-	"dnsLabelPrefix": {
-	    "type": "string",
-	    "metadata": {
-		"description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
-	    }
-	},
-	"ubuntuOSVersion": {
-	    "type": "string",
-	    "defaultValue": "16.04.0-LTS",
-	    "allowedValues": [
-		"12.04.5-LTS",
-		"14.04.5-LTS",
-		"15.10",
-		"16.04.0-LTS"
-	    ],
-	    "metadata": {
-		"description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version."
-	    }
-	}
+  "parameters": {
+    "name": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Virtual Machine"
+      }
     },
-    "variables": {
-	
-	"storageSkuToVmSizeMapping": {
-	    "Comments": "The storageSkuToVmSizeMapping.standardSkus contains all the VM sizes that only support the standard storage SKU",
-	    "Standard_SKUs": ["Standard_A0", "Standard_A1"],
-	    "true": "Standard_LRS",
-	    "false": "Premium_LRS"
-	},
-	"effectiveStorageSkuSize": "[variables('storageSkuToVmSizeMapping')[tostring(contains(variables('storageSkuToVmSizeMapping'.StandardSkus), parameters(size)))]]",
-	"storageAccountNameSelector": {
-	    "Comments": "Determine storage account name based on length of provided storage account name parameter value",
-	    "true": "[parameters('storageAccount')]",
-	    "false": "[uniqestring(concat(subscription(), resourceGroup(), parameters('name')))]"
-	},
-	"shouldCreateStorageAccount": "[equals(contains(parameters('storageAccountName'), '/'), false)]",
-	"effectiveStorageAccountName": "[variables('storageAccountNameSelector')[tostring(equals(length(parameters('storageAccount')), 0))]]",
-
-	
-	"shouldCreatePublicIpAddress": "[equals(contains(parameters('publicIpAddressName'), '/'), false)]",
-	"vmShouldReferencePublicIpAddress": "[equals(empty(parameters('publicIpAddressName')), false]]",
-	"publicIpAddressPropertiesBase": {
-	    "publicIPAllocationMethod": "[variables('publicIPAddressType')]"
-	},
-	"publicIpAddressDnsSettingsFragmentMap": {
-	    "true": {
-		"dnsSettings": {
-		    "domainNameLabel": "[parameters('publicIpAddressDnsLabelPrefix')]"
-		}
-	    },
-	    "false": {}
-	},
-	"publicIpAddressDnsSettingsFragment": "[variables('publicIpAddressDnsSettingsFragmentMap')[tostring(equals(empty(parameters('publicIpAddressDnsLabelPrefix')), false))]]",
-	"publicIpAddressProperties": "[union(variables('publicIpAddressPropertiesBase'), variables('publicIpAddressFragment'))]",
-	
-	
-	"shouldCreateVnet": "[equals(contains(parameters('vnetNameOrId'), '/'), false)]",
-
-	
-	
-	"SECTION_VM_START": "",
-	
-	"availabilitySetFragmentMap": {
-	    "true": {
-		"availabilitySet": {
-		    "id": "[variables('availabilitySet')]"
-		}
-	    },
-	    "false": {}
-	},
-	"availabilitySetFragment": "[variabels('availabilitySetFragmentMap')[string(equals(empty(parameters('availabilitySet')), false))]]",
-	
-	"licenseTypeFragmentMap": {
-	    "true": {
-			"licenseType": "[parameters('licenseType')]"
-	    },
-	    "false": {}
-	},
-	"licenseTypeFragment": "[variables('licenseTypeFragmentMap')[string(equals(empty(parameters('licenseType')), false))]]",
-	
-
-	"imageReferenceFragmentMap": {
-	    "true": {
-		"storageProfile": {
-		    "imageReference": "[parameters('imageReference')]"
-		}
-	    },
-	    "false": {}
-	},
-	"imageReferenceFragment": "[variables('imageReferenceFragmentMap')[string(equals(empty(parameters('imageReference')), false))]]",
-	
-    
-	"vmBaseProperties": {
-	    "hardwareProfile": {
-		"vmSize": "[parameters('vmSize')]"
-	    }
-	    
-	},
-
-	"vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragment'))]",
-	
-	
-	
-	"imagePublisher": "Canonical",
-	"imageOffer": "UbuntuServer",
-	"nicName": "myVMNic",
-	"addressPrefix": "10.0.0.0/16",
-	"subnetName": "Subnet",
-	"subnetPrefix": "10.0.0.0/24",
-	"storageAccountType": "Standard_LRS",
-	"vmSize": "Standard_A1",
-	"virtualNetworkName": "MyVNET",
-	"vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
-	"subnetRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetName'))]"
+    "size": {
+      "type": "string",
+      "defaultValue": "Standard_DS1_V2",
+      "metadata": {
+        "description": "Size of Virtual Machine"
+      }
     },
-    "resources": [
-	{
-	    "condition": "[variables('shouldCreateStorageAccount')]",
-	    "type": "Microsoft.Storage/storageAccounts",
-	    "name": "[variables('effectiveStorageAccountName')]",
-	    "apiVersion": "2017-06-01",
-	    "location": "[resourceGroup().location]",
-	    "sku": {
-		"name": "[variables('effectiveStorageAccountSize')]"
-	    },
-	    "kind": "Storage",
-	    "properties": {}
-	},
-	{
-	    "condition": "[variabels('shouldCreateVnet')]",
-	    "apiVersion": "2017-04-01",
-	    "type": "Microsoft.Network/virtualNetworks",
-	    "name": "[variables('virtualNetworkName')]",
-	    "location": "[resourceGroup().location]",
-	    "properties": "[variables('vnetProperties')]]"
-	},
-	{
-	    "condition": "[variables('shouldCreatePublicIpAddress')]",
-	    "apiVersion": "2017-04-01",
-	    "type": "Microsoft.Network/publicIPAddresses",
-	    "name": "[parameters('publicIPAddressName')]",
-	    "location": "[resourceGroup().location]",
-	    "properties": "[variables('publicIpAddressProperties')]"
-	},
-	{
-	    "apiVersion": "2017-04-01",
-	    "type": "Microsoft.Network/virtualNetworks",
-	    "name": "[variables('virtualNetworkName')]",
-	    "location": "[resourceGroup().location]",
-	    "properties": {
-		"addressSpace": {
-		    "addressPrefixes": [
-			"[variables('addressPrefix')]"
-		    ]
-		},
-		"subnets": [
-		    {
-			"name": "[variables('subnetName')]",
-			"properties": {
-			    "addressPrefix": "[variables('subnetPrefix')]"
-			}
-		    }
-		]
-	    }
-	},
-	{
-	    "apiVersion": "2017-04-01",
-	    "type": "Microsoft.Network/networkInterfaces",
-	    "name": "[variables('nicName')]",
-	    "location": "[resourceGroup().location]",
-	    "dependsOn": [
-		"[resourceId('Microsoft.Network/publicIPAddresses/', variables('publicIPAddressName'))]",
-		"[resourceId('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
-	    ],
-	    "properties": {
-		"ipConfigurations": [
-		    {
-			"name": "ipconfig1",
-			"properties": {
-			    "privateIPAllocationMethod": "Dynamic",
-			    "publicIPAddress": {
-				"id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))]"
-			    },
-			    "subnet": {
-				"id": "[variables('subnetRef')]"
-			    }
-			}
-		    }
-		]
-	    }
-	},
-	{
-	    "apiVersion": "2017-03-30",
-	    "type": "Microsoft.Compute/virtualMachines",
-	    "name": "[parameters('name')]",
-	    "location": "[resourceGroup().location]",
-	    "dependsOn": [
-		"[resourceId('Microsoft.Storage/storageAccounts/', variables('effectiveStorageAccountName'))]",
-		"[resourceId('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
-	    ],
-	    "properties": {
-		"hardwareProfile": {
-		    "vmSize": "[parameters('size')]"
-		},
-		"osProfile": {
-		    "computerName": "[parameters('name')]",
-		    "adminUsername": "[parameters('adminUsername')]",
-		    "adminPassword": "[parameters('adminPassword')]"
-		},
-		"storageProfile": {
-		    "imageReference": {
-			"publisher": "[variables('imagePublisher')]",
-            "offer": "[variables('imageOffer')]",
-			"sku": "[parameters('ubuntuOSVersion')]",
-			"version": "latest"
-		    },
-		    "osDisk": {
-			"createOption": "FromImage"
-		    },
-		    "dataDisks": [
-			{
-			    "diskSizeGB": "1023",
-			    "lun": 0,
-			    "createOption": "Empty"
-			}
-		    ]
-		},
-		"networkProfile": {
-		    "networkInterfaces": [
-			{
-			    "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
-			}
-		    ]
-		},
-		"diagnosticsProfile": {
-		    "bootDiagnostics": {
-			"enabled": "true",
-			"storageUri": "[concat(reference(concat('Microsoft.Storage/storageAccounts/', variables('effectiveStorageAccountName')), '2016-01-01').primaryEndpoints.blob)]"
-		    }
-		}
-	    }
-	}
-    ],
-    "outputs": {
-	"hostname": {
-	    "type": "string",
-	    "value": "[reference(variables('publicIPAddressName')).dnsSettings.fqdn]"
-	},
-	"sshCommand": {
-	    "type": "string",
-	    "value": "[concat('ssh ', parameters('adminUsername'), '@', reference(variables('publicIPAddressName')).dnsSettings.fqdn)]"
-	}
+    "availabilitySet": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "storageAccount": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "shouldCreateStorageAccount": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "imageReference": {
+      "type": "object",
+      "defaultValue": { },
+      "metadata": {
+        "description": "Image reference including id, publisher, offer, sku, version"
+      }
+    },
+    "licenseType": {
+      "type": "string",
+      "allowedValues": [
+        "Windows_Client",
+        "Windows_Server",
+        ""
+      ],
+      "defaultValue": ""
+    },
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "User name for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
     }
+  },
+  "variables": {
+
+
+    "SECTION_VM_START": "",
+
+    "availabilitySetFragmentMap": {
+      "true": {
+        "availabilitySet": {
+          "id": "[parameters('availabilitySet')]"
+        }
+      },
+      "false": { }
+    },
+    "availabilitySetFragmentMapKey": "[string(greater(length(parameters('availabilitySet')), 0))]",
+    "availabilitySetFragment": "[variables('availabilitySetFragmentMap')[variables('availabilitySetFragmentMapKey')]]",
+
+
+    "licenseTypeFragmentMap": {
+      "true": {
+        "licenseType": "[parameters('licenseType')]"
+      },
+      "false": { }
+    },
+    "licenseTypeFragmentMapKey": "[string(greater(length(parameters('licenseType')), 0))]",
+    "licenseTypeFragment": "[variables('licenseTypeFragmentMap')[variables('licenseTypeFragmentMapKey')]]",
+
+    "imageReferenceFragmentToDo": {
+      "storageProfile": {
+        "imageReference": {
+          "publisher": "Canonical",
+          "offer": "UbuntuServer",
+          "sku": "16.04.0-LTS",
+          "version": "latest"
+        },
+        "osDisk": {
+          "createOption": "FromImage"
+        },
+        "dataDisks": [
+          {
+            "diskSizeGB": "1023",
+            "lun": 0,
+            "createOption": "Empty"
+          }
+        ]
+      }
+    },
+
+    "storageAccountNameSelector": {
+      "true": "[uniqueString(concat(string(subscription()), resourceGroup().name, parameters('name')))]",
+      "false": "[parameters('storageAccount')]"
+    },
+    "effectiveStorageAccountName": "[variables('storageAccountNameSelector')[string(equals(length(parameters('storageAccount')), 0))]]",
+    "effectiveStorageAccountSizeToDo": "Standard_LRS",
+
+    "adminPasswordFragmentMap": {
+      "true": {
+        "osProfile": {
+          "adminPassword": "[parameters('adminPassword')]"
+        }
+      },
+      "false": { }
+    },
+    "adminPasswordFragment": "[variables('adminPasswordFragmentMap')[string(greater(length(parameters('adminPassword')), 0))]]",
+
+    "vmBaseProperties": {
+      "hardwareProfile": {
+        "vmSize": "[parameters('size')]"
+      },
+      "osProfile": {
+        "computerName": "[parameters('name')]",
+        "adminUsername": "[parameters('adminUsername')]"
+      },
+      "networkProfile": {
+        "networkInterfaces": [
+          {
+            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+          }
+        ]
+      }
+    },
+
+    "vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragmentToDo'), variables('adminPasswordFragment'))]",
+
+    "nicName": "stenis",
+    "addressPrefix": "10.0.0.0/16",
+    "subnetName": "Subnet",
+    "subnetPrefix": "10.0.0.0/24",
+    "storageAccountType": "Standard_LRS",
+    "virtualNetworkName": "stenis",
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
+    "subnetRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetName'))]"
+  },
+  "resources": [
+    {
+      "condition": "[parameters('shouldCreateStorageAccount')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[variables('effectiveStorageAccountName')]",
+      "apiVersion": "2017-06-01",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "[variables('effectiveStorageAccountSizeToDo')]"
+      },
+      "kind": "Storage",
+      "properties": { }
+    },
+    {
+      "apiVersion": "2017-03-30",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('name')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/', variables('effectiveStorageAccountName'))]"
+      ],
+      "properties": "[variables('vmProperties')]"
+    }
+  ],
+  "outputs": {
+    "virtualMachine": {
+      "type": "object",
+      "value": "[reference(parameters('name'))]"
+    }
+  }
 }
