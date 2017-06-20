@@ -15,6 +15,18 @@
         "description": "Size of Virtual Machine"
       }
     },
+    "osType": {
+      "type": "string",
+      "allowedValues": [
+        "linux",
+        "windows"
+      ],
+      "defaultValue": "linux"
+    },
+    "sshPublicKey": {
+      "type": "string",
+      "defaultValue": ""
+    },
     "availabilitySet": {
       "type": "string",
       "defaultValue": ""
@@ -111,24 +123,46 @@
     "effectiveStorageAccountName": "[variables('storageAccountNameSelector')[string(equals(length(parameters('storageAccount')), 0))]]",
     "effectiveStorageAccountSizeToDo": "Standard_LRS",
 
-    "adminPasswordFragmentMap": {
+    "osProfileAdminPasswordFragmentMap": {
       "true": {
-        "osProfile": {
-          "adminPassword": "[parameters('adminPassword')]"
-        }
+        "adminPassword": "[parameters('adminPassword')]"
       },
       "false": { }
     },
-    "adminPasswordFragment": "[variables('adminPasswordFragmentMap')[string(greater(length(parameters('adminPassword')), 0))]]",
+    "osProfileAdminPasswordFragment": "[variables('osProfileAdminPasswordFragmentMap')[string(greater(length(parameters('adminPassword')), 0))]]",
+
+    "osProfileBaseProperties": {
+      "computerName": "[parameters('name')]",
+      "adminUsername": "[parameters('adminUsername')]"
+    },
+
+    "osProfilePlatformConfigurations": {
+      "linux": {
+        "linuxConfiguration": {
+          "disablePasswordAuthentication": "[empty(parameters('adminPassword'))]",
+          "ssh": {
+            "publicKeys": [
+              {
+                "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
+                "keyData": "[parameters('sshPublicKey')]"
+              }
+            ]
+          }
+        }
+      },
+      "windows": {
+      }
+    },
+
+    "osProfilePlatformConfigurationFragment": "[variables('osProfilePlatformConfigurations')[parameters('osType')]]",
+
+    "osProfileProperties": "[union(variables('osProfileBaseProperties'), variables('osProfileAdminPasswordFragment'), variables('osProfilePlatformConfigurationFragment'))]",
 
     "vmBaseProperties": {
       "hardwareProfile": {
         "vmSize": "[parameters('size')]"
       },
-      "osProfile": {
-        "computerName": "[parameters('name')]",
-        "adminUsername": "[parameters('adminUsername')]"
-      },
+      "osProfile": "[variables('osProfileProperties')]",
       "networkProfile": {
         "networkInterfaces": [
           {
@@ -138,7 +172,7 @@
       }
     },
 
-    "vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragmentToDo'), variables('adminPasswordFragment'))]",
+    "vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragmentToDo'))]",
 
     "nicName": "stenis",
     "addressPrefix": "10.0.0.0/16",
