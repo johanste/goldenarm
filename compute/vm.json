@@ -31,21 +31,45 @@
       "type": "string",
       "defaultValue": ""
     },
+    "sshKeyPath": {
+      "type": "string",
+      "defaultValue": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]"
+    },
     "availabilitySet": {
       "type": "string",
       "defaultValue": ""
+    },
+    "customData": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Specifies a base-64 encoded string of custom data. The base-64 encoded string is decoded to a binary array that is saved as a file on the Virtual Machine. The maximum length of the binary array is 65535 bytes. "
+      }
     },
     "storageAccount": {
       "type": "string",
       "defaultValue": ""
     },
-    "shouldCreateStorageAccount": {
+    "shouldCreateStorageAccountToDo": {
       "type": "bool",
       "defaultValue": true
     },
     "imageReference": {
       "type": "object",
-      "defaultValue": { },
+      "defaultValue": {
+        "publisher": "Canonical",
+        "offer": "UbuntuServer",
+        "sku": "16.04.0-LTS",
+        "version": "latest"
+      }
+    },
+    "osDiskCreateOption": {
+      "type": "string",
+      "defaultValue": "FromImage",
+      "allowedValues": [
+        "Attach",
+        "FromImage"
+      ],
       "metadata": {
         "description": "Image reference including id, publisher, offer, sku, version"
       }
@@ -71,44 +95,47 @@
       "metadata": {
         "description": "Password for the Virtual Machine."
       }
+    },
+    "nicIds": {
+      "type": "array",
+      "minLength": 1,
+      "defaultValue": [
+        "[resourceId('Microsoft.Network/networkInterfaces', 'stenis')]"
+      ]
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {}
     }
   },
   "variables": {
 
-
-    "SECTION_VM_START": "",
-
+    "availabilitySetFragmentMapKey": "[string(greater(length(parameters('availabilitySet')), 0))]",
     "availabilitySetFragmentMap": {
       "true": {
         "availabilitySet": {
           "id": "[parameters('availabilitySet')]"
         }
       },
-      "false": { }
+      "false": {}
     },
-    "availabilitySetFragmentMapKey": "[string(greater(length(parameters('availabilitySet')), 0))]",
     "availabilitySetFragment": "[variables('availabilitySetFragmentMap')[variables('availabilitySetFragmentMapKey')]]",
 
 
+    "licenseTypeFragmentMapKey": "[string(greater(length(parameters('licenseType')), 0))]",
     "licenseTypeFragmentMap": {
       "true": {
         "licenseType": "[parameters('licenseType')]"
       },
-      "false": { }
+      "false": {}
     },
-    "licenseTypeFragmentMapKey": "[string(greater(length(parameters('licenseType')), 0))]",
     "licenseTypeFragment": "[variables('licenseTypeFragmentMap')[variables('licenseTypeFragmentMapKey')]]",
 
-    "imageReferenceFragmentToDo": {
+    "imageReferenceFragment": {
       "storageProfile": {
-        "imageReference": {
-          "publisher": "Canonical",
-          "offer": "UbuntuServer",
-          "sku": "16.04.0-LTS",
-          "version": "latest"
-        },
+        "imageReference": "[parameters('imageReference')]",
         "osDisk": {
-          "createOption": "FromImage"
+          "createOption": "[parameters('osDiskCreateOption')]"
         },
         "dataDisks": [
           {
@@ -120,20 +147,31 @@
       }
     },
 
-    "storageAccountNameSelector": {
+    "storageAccountMapKey": "[string(equals(length(parameters('storageAccount')), 0))]",
+    "storageAccountNameMap": {
       "true": "[uniqueString(concat(string(subscription()), resourceGroup().name, parameters('name')))]",
       "false": "[parameters('storageAccount')]"
     },
-    "effectiveStorageAccountName": "[variables('storageAccountNameSelector')[string(equals(length(parameters('storageAccount')), 0))]]",
+    "storageAccountName": "[variables('storageAccountNameMap')[variables('storageAccountMapKey')]]",
     "effectiveStorageAccountSizeToDo": "Standard_LRS",
 
+    "osProfileAdminPasswordFragmentMapKey": "[string(greater(length(parameters('adminPassword')), 0))]",
     "osProfileAdminPasswordFragmentMap": {
       "true": {
         "adminPassword": "[parameters('adminPassword')]"
       },
-      "false": { }
+      "false": {}
     },
-    "osProfileAdminPasswordFragment": "[variables('osProfileAdminPasswordFragmentMap')[string(greater(length(parameters('adminPassword')), 0))]]",
+    "osProfileAdminPasswordFragment": "[variables('osProfileAdminPasswordFragmentMap')[variables('osProfileAdminPasswordFragmentMapKey')]]",
+
+    "osProfileCustomDataFragmentMapKey": "[string(greater(length(parameters('customData')), 0))]",
+    "osProfileCustomDataFragmentMap": {
+      "true": {
+        "customData": "[parameters('customData')]"
+      },
+      "false": {}
+    },
+    "osProfileCustomDataFragment": "[variables('osProfileCustomDataFragmentMap')[variables('osProfileCustomDataFragmentMapKey')]]",
 
     "osProfileBaseProperties": {
       "computerName": "[parameters('name')]",
@@ -144,17 +182,17 @@
       "true": {
         "publicKeys": [
           {
-            "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
+            "path": "[parameters('sshKeyPath')]",
             "keyData": "[parameters('sshPublicKey')]"
           }
         ]
       },
       "false": {
-        "publicKeys": [ ]
+        "publicKeys": []
       }
     },
 
-    "osProfilePlatformConfigurations": {
+    "osProfilePlatformConfigurationsFragmentMap": {
       "linux": {
         "linuxConfiguration": {
           "disablePasswordAuthentication": "[empty(parameters('adminPassword'))]",
@@ -164,10 +202,40 @@
       "windows": {
       }
     },
+    "osProfilePlatformConfigurationFragment": "[variables('osProfilePlatformConfigurationsFragmentMap')[parameters('osType')]]",
 
-    "osProfilePlatformConfigurationFragment": "[variables('osProfilePlatformConfigurations')[parameters('osType')]]",
+    "osProfileProperties": "[union(variables('osProfileBaseProperties'), variables('osProfileAdminPasswordFragment'), variables('osProfilePlatformConfigurationFragment'), variables('osProfileCustomDataFragment'))]",
 
-    "osProfileProperties": "[union(variables('osProfileBaseProperties'), variables('osProfileAdminPasswordFragment'), variables('osProfilePlatformConfigurationFragment'))]",
+    "dummyObject": [ null ],
+    "nicCount": "[length(parameters('nicIds'))]",
+    "nicParamsPlusOne": "[concat(parameters('nicIds'), variables('dummyObject'))]",
+    "nicReferenceArray": [
+      {
+        "id": "[variables('nicParamsPlusOne')[min(variables('nicCount'), 0)]]",
+        "properties": {
+          "primary": true
+        }
+      },
+      {
+        "id": "[variables('nicParamsPlusOne')[min(variables('nicCount'), 1)]]",
+        "properties": {
+          "primary": false
+        }
+      },
+      {
+        "id": "[variables('nicParamsPlusOne')[min(variables('nicCount'), 2)]]",
+        "properties": {
+          "primary": false
+        }
+      },
+      {
+        "id": "[variables('nicParamsPlusOne')[min(variables('nicCount'), 3)]]",
+        "properties": {
+          "primary": false
+        }
+      }
+    ],
+    "nicReferences": "[take(variables('nicReferenceArray'), variables('nicCount'))]",
 
     "vmBaseProperties": {
       "hardwareProfile": {
@@ -175,37 +243,27 @@
       },
       "osProfile": "[variables('osProfileProperties')]",
       "networkProfile": {
-        "networkInterfaces": [
-          {
-            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
-          }
-        ]
+        "networkInterfaces": "[variables('nicReferences')]"
       }
     },
 
-    "vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragmentToDo'))]",
+    "vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragment'))]",
 
-    "nicName": "stenis",
-    "addressPrefix": "10.0.0.0/16",
-    "subnetName": "Subnet",
-    "subnetPrefix": "10.0.0.0/24",
-    "storageAccountType": "Standard_LRS",
-    "virtualNetworkName": "stenis",
-    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
-    "subnetRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetName'))]"
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks','stenis')]",
+    "subnetRef": "[concat(variables('vnetID'),'/subnets/','Subnet')]"
   },
   "resources": [
     {
-      "condition": "[parameters('shouldCreateStorageAccount')]",
+      "condition": "[parameters('shouldCreateStorageAccountToDo')]",
       "type": "Microsoft.Storage/storageAccounts",
-      "name": "[variables('effectiveStorageAccountName')]",
+      "name": "[variables('storageAccountName')]",
       "apiVersion": "2017-06-01",
       "location": "[parameters('location')]",
       "sku": {
         "name": "[variables('effectiveStorageAccountSizeToDo')]"
       },
       "kind": "Storage",
-      "properties": { }
+      "properties": {}
     },
     {
       "apiVersion": "2017-03-30",
@@ -213,12 +271,17 @@
       "name": "[parameters('name')]",
       "location": "[parameters('location')]",
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts/', variables('effectiveStorageAccountName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
       ],
-      "properties": "[variables('vmProperties')]"
+      "properties": "[variables('vmProperties')]",
+      "tags": "[parameters('tags')]"
     }
   ],
   "outputs": {
+    "virtualMachineInputPropertiesToDo": {
+      "type": "object",
+      "value": "[variables('vmProperties')]"
+    },
     "virtualMachine": {
       "type": "object",
       "value": "[reference(parameters('name'))]"
