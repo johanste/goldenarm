@@ -46,14 +46,6 @@
         "description": "Specifies a base-64 encoded string of custom data. The base-64 encoded string is decoded to a binary array that is saved as a file on the Virtual Machine. The maximum length of the binary array is 65535 bytes. "
       }
     },
-    "storageAccount": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "shouldCreateStorageAccountToDo": {
-      "type": "bool",
-      "defaultValue": true
-    },
     "imageReference": {
       "type": "object",
       "defaultValue": {
@@ -106,6 +98,25 @@
     "tags": {
       "type": "object",
       "defaultValue": {}
+    },
+
+    "unmanagedDiskStorageAccount": {
+      "type": "object",
+      "defaultValue": {
+        "name": "dummy",
+        "resourceGroup": null,
+        "type": null,
+        "newOrExisting": "ignore"
+      },
+      "metadata": {
+        "description": "If specified, use unmanaged disks. The value corresponds to the output from https://docs.microsoft.com/en-us/azure/azure-resource-manager/managed-application-microsoft-storage-storageaccountselector",
+        "example": {
+          "name": "storageaccount01",
+          "resourceGroup": "rg01",
+          "type": "Premium_LRS",
+          "newOrExisting": "new"
+        }
+      }
     }
   },
   "variables": {
@@ -147,13 +158,7 @@
       }
     },
 
-    "storageAccountMapKey": "[string(equals(length(parameters('storageAccount')), 0))]",
-    "storageAccountNameMap": {
-      "true": "[uniqueString(concat(string(subscription()), resourceGroup().name, parameters('name')))]",
-      "false": "[parameters('storageAccount')]"
-    },
-    "storageAccountName": "[variables('storageAccountNameMap')[variables('storageAccountMapKey')]]",
-    "effectiveStorageAccountSizeToDo": "Standard_LRS",
+    "shouldCreateStorageAccount": "[equals(parameters('unmanagedDiskStorageAccount').newOrExisting, 'new')]",
 
     "osProfileAdminPasswordFragmentMapKey": "[string(greater(length(parameters('adminPassword')), 0))]",
     "osProfileAdminPasswordFragmentMap": {
@@ -254,13 +259,13 @@
   },
   "resources": [
     {
-      "condition": "[parameters('shouldCreateStorageAccountToDo')]",
+      "condition": "[variables('shouldCreateStorageAccount')]",
       "type": "Microsoft.Storage/storageAccounts",
-      "name": "[variables('storageAccountName')]",
+      "name": "[parameters('unmanagedDiskStorageAccount').name]",
       "apiVersion": "2017-06-01",
       "location": "[parameters('location')]",
       "sku": {
-        "name": "[variables('effectiveStorageAccountSizeToDo')]"
+        "name": "[parameters('unmanagedDiskStorageAccount').type]"
       },
       "kind": "Storage",
       "properties": {}
@@ -271,7 +276,7 @@
       "name": "[parameters('name')]",
       "location": "[parameters('location')]",
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts/', parameters('unmanagedDiskStorageAccount').name)]"
       ],
       "properties": "[variables('vmProperties')]",
       "tags": "[parameters('tags')]"
