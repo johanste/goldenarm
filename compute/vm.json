@@ -117,6 +117,30 @@
           "newOrExisting": "new"
         }
       }
+    },
+
+    "subnet": {
+      "type": "object",
+      "defaultValue": {
+        "name": "dummy",
+        "newOrExisting": "ignore"
+      },
+      "metadata": {
+        "description": "Optional value corresponding to the schema of the output for https://docs.microsoft.com/en-us/azure/azure-resource-manager/managed-application-microsoft-network-virtualnetworkcombo. If specified, and newOrExisting is set to 'new', a new VNET (with subnets) and NIC will be created",
+        "example": {
+          "name": "vnet01",
+          "resourceGroup": "rg01",
+          "addressPrefixes": [ "10.0.0.0/16" ],
+          "newOrExisting": "new",
+          "subnets": {
+            "subnet": {
+              "name": "subnet-1",
+              "addressPrefix": "10.0.0.0/24",
+              "startAddress": "10.0.0.1"
+            }
+          }
+        }
+      }
     }
   },
   "variables": {
@@ -258,6 +282,26 @@
     "subnetRef": "[concat(variables('vnetID'),'/subnets/','Subnet')]"
   },
   "resources": [
+    {
+      "condition": "[equals(parameters('subnet').newOrExisting, 'new')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[parameters('subnet').name]",
+      "apiVersion": "2017-03-01",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": "[array(parameters('subnet').addressPrefixes)]"
+        },
+        "subnets": [
+          {
+            "name": "subnet",
+            "properties": {
+              "addressPrefix": "[parameters('subnet').subnets.subnet.addressPrefix]"
+            }
+          }
+        ]
+      }
+    },
     {
       "condition": "[variables('shouldCreateStorageAccount')]",
       "type": "Microsoft.Storage/storageAccounts",
