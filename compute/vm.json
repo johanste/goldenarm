@@ -8,7 +8,7 @@
         "description": "Name of Virtual Machine"
       }
     },
-    "size": {
+    "vmSize": {
       "type": "string",
       "defaultValue": "Standard_DS1_V2",
       "metadata": {
@@ -90,10 +90,7 @@
     },
     "nicIds": {
       "type": "array",
-      "minLength": 1,
-      "defaultValue": [
-        "[resourceId('Microsoft.Network/networkInterfaces', 'stenis')]"
-      ]
+      "defaultValue": [ ]
     },
     "tags": {
       "type": "object",
@@ -119,6 +116,29 @@
       }
     },
 
+    "nic": {
+      "type": "object",
+      "defaultValue": {
+        "name": "dummy",
+        "newOrExisting": "ignore"
+      },
+      "metadata": {
+        "description": "Nic create options. If provided, and the newOrExisting property is set to 'new', we will create the corresponding NIC",
+        "example": {
+          "name": "myLittleNic",
+          "resourceGroup": "rg01",
+          "newOrExisting": "new"
+        }
+      }
+    },
+    "privateIpAllocationMethod": {
+      "type": "string",
+      "defaultValue": "dynamic",
+      "allowedValues": [
+        "dynamic",
+        "static"
+      ]
+    },
     "subnet": {
       "type": "object",
       "defaultValue": {
@@ -134,7 +154,7 @@
           "newOrExisting": "new",
           "subnets": {
             "subnet": {
-              "name": "subnet-1",
+              "name": "subnet",
               "addressPrefix": "10.0.0.0/24",
               "startAddress": "10.0.0.1"
             }
@@ -264,11 +284,20 @@
         }
       }
     ],
-    "nicReferences": "[take(variables('nicReferenceArray'), variables('nicCount'))]",
+    "nicReferencesMapKey": "[string(greater(variables('nicCount'), 0))]",
+    "nicReferencesMap": {
+      "true": "[take(variables('nicReferenceArray'), variables('nicCount'))]",
+      "false": [
+        {
+          "id": "[resourceId(resourceGroup().name, 'Microsoft.Network/networkInterfaces', parameters('nic').name)]"
+        }
+      ]
+    },
 
+    "nicReferences": "[variables('nicReferencesMap')[variables('nicReferencesMapKey')]]",
     "vmBaseProperties": {
       "hardwareProfile": {
-        "vmSize": "[parameters('size')]"
+        "vmSize": "[parameters('vmSize')]"
       },
       "osProfile": "[variables('osProfileProperties')]",
       "networkProfile": {
@@ -278,10 +307,33 @@
 
     "vmProperties": "[union(variables('vmBaseProperties'), variables('availabilitySetFragment'), variables('imageReferenceFragment'))]",
 
-    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks','stenis')]",
-    "subnetRef": "[concat(variables('vnetID'),'/subnets/','Subnet')]"
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks', parameters('subnet').name)]",
+    "subnetRef": "[concat(variables('vnetID'),'/subnets/','subnet')]"
   },
   "resources": [
+    {
+      "condition": "[equals(parameters('nic').newOrExisting, 'new')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[parameters('nic').name]",
+      "apiVersion": "2017-03-01",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1ToDo",
+            "properties": {
+              "privateIPAllocationMethod": "[parameters('privateIpAllocationMethod')]",
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[variables('vnetId')]"
+      ]
+    },
     {
       "condition": "[equals(parameters('subnet').newOrExisting, 'new')]",
       "type": "Microsoft.Network/virtualNetworks",
@@ -320,7 +372,8 @@
       "name": "[parameters('name')]",
       "location": "[parameters('location')]",
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts/', parameters('unmanagedDiskStorageAccount').name)]"
+        "[resourceId('Microsoft.Storage/storageAccounts/', parameters('unmanagedDiskStorageAccount').name)]",
+        "[variables('nicReferences')[0].id]"
       ],
       "properties": "[variables('vmProperties')]",
       "tags": "[parameters('tags')]"

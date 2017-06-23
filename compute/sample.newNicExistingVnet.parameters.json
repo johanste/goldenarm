@@ -1,0 +1,28 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "subnet": {
+      "value": {
+        "name": "defaultVnet",
+        "resourceGroup": "rg01",
+        "addressPrefixes": [ "10.0.0.0/16" ],
+        "newOrExisting": "existing",
+        "subnets": {
+          "subnet": {
+            "name": "subnet",
+            "addressPrefix": "10.0.0.0/24",
+            "startAddress": "10.0.0.1"
+          }
+        }
+      }
+    },
+    "nic": {
+      "value": {
+        "name": "nic2",
+        "resourceGroup": "rg01",
+        "newOrExisting": "new"
+      }
+    }
+  }
+}
