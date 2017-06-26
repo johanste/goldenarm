@@ -23,6 +23,9 @@
         "resourceGroup": "rg01",
         "newOrExisting": "existing"
       }
+    },
+    "dataDiskSizes": {
+      "value": [ 1023, 512 ]
     }
   }
 }

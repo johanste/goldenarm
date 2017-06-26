@@ -55,6 +55,10 @@
         "version": "latest"
       }
     },
+    "dataDiskSizes": {
+      "type": "array",
+      "defaultValue": []
+    },
     "osDiskCreateOption": {
       "type": "string",
       "defaultValue": "FromImage",
@@ -186,19 +190,49 @@
     },
     "licenseTypeFragment": "[variables('licenseTypeFragmentMap')[variables('licenseTypeFragmentMapKey')]]",
 
+    "dataDiskCreateSizeCount": "[length(parameters('dataDiskSizes'))]",
+    "dummy": [ null ],
+    "dataDiskCreateSizesPlusOne": "[concat(parameters('dataDiskSizes'), variables('dummy'))]",
+    "dataDiskCreateArrayPlusOne": [
+      {
+        "diskSizeGB": "[variables('dataDiskCreateSizesPlusOne')[min(variables('dataDiskCreateSizeCount'), 0)]]",
+        "lun": 0,
+        "createOption": "Empty"
+      },
+      {
+        "diskSizeGB": "[variables('dataDiskCreateSizesPlusOne')[min(variables('dataDiskCreateSizeCount'), 1)]]",
+        "lun": 1,
+        "createOption": "Empty"
+      },
+      {
+        "diskSizeGB": "[variables('dataDiskCreateSizesPlusOne')[min(variables('dataDiskCreateSizeCount'), 2)]]",
+        "lun": 2,
+        "createOption": "Empty"
+      },
+      {
+        "diskSizeGB": "[variables('dataDiskCreateSizesPlusOne')[min(variables('dataDiskCreateSizeCount'), 3)]]",
+        "lun": 3,
+        "createOption": "Empty"
+      },
+      {
+        "diskSizeGB": "[variables('dataDiskCreateSizesPlusOne')[min(variables('dataDiskCreateSizeCount'), 4)]]",
+        "lun": 4,
+        "createOption": "Empty"
+      },
+      {
+        "diskSizeGB": "[variables('dataDiskCreateSizesPlusOne')[min(variables('dataDiskCreateSizeCount'), 5)]]",
+        "lun": 5,
+        "createOption": "Empty"
+      }
+    ],
+    "dataDiskCreateArray": "[take(variables('dataDiskCreateArrayPlusOne'), variables('dataDiskCreateSizeCount'))]",
     "imageReferenceFragment": {
       "storageProfile": {
         "imageReference": "[parameters('imageReference')]",
         "osDisk": {
           "createOption": "[parameters('osDiskCreateOption')]"
         },
-        "dataDisks": [
-          {
-            "diskSizeGB": "1023",
-            "lun": 0,
-            "createOption": "Empty"
-          }
-        ]
+        "dataDisks": "[variables('dataDiskCreateArray')]"
       }
     },
 
